@@ -1,103 +1,133 @@
-import streamlit as st
-import ollama
-import base64
+#!/usr/bin/env python3
+from quart import Quart, render_template, request, jsonify
 from PIL import Image
+from apps.database import init_db, add_or_update_website, get_all_websites, delete_website
+from apps.ollama import process_image
+from apps.browser_service import BrowserService
+import base64
 import io
-import os
-import tempfile
+import logging
+import asyncio
+import json
 
-st.set_page_config(
-    page_title="Llama 3.2 Vision with Ollama",
-    page_icon="🦙",
-    layout="wide"
+app = Quart(__name__)
+init_db()
+
+# Configure logging - only show WARNING and above
+logging.basicConfig(
+    level=logging.WARNING,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-def process_image(image, prompt):
-    """Process image with Ollama's Python library"""
-    # Convert image to RGB if necessary (handles PNG with alpha channel)
-    if image.mode in ('RGBA', 'LA') or (image.mode == 'P' and 'transparency' in image.info):
-        bg = Image.new('RGB', image.size, (255, 255, 255))
-        if image.mode == 'P':
-            image = image.convert('RGBA')
-        bg.paste(image, mask=image.split()[3])
-        image = bg
-    elif image.mode != 'RGB':
-        image = image.convert('RGB')
+# Initialize browser service
+browser_service = BrowserService()
 
-    # Save image to a temporary file
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
-        temp_filename = temp_file.name
-        image.save(temp_filename, 'JPEG', quality=95)
-    
+@app.template_filter('b64encode')
+def b64encode_filter(data):
+    if data is None:
+        return None
+    return base64.b64encode(data).decode()
+
+@app.route('/')
+async def index():
+    websites = get_all_websites()
+    return await render_template('index.html', 
+                         title="Modern Price Tool",
+                         websites=websites)
+
+@app.route('/add-item', methods=['POST'])
+async def add_item():
     try:
-        # Use the Ollama Python library to send request
-        response = ollama.chat(
-            model='llama3.2-vision',
-            messages=[{
-                'role': 'user',
-                'content': prompt,
-                'images': [temp_filename]
-            }]
+        data = await request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        url = data.get('url')
+        if not url:
+            return jsonify({'error': 'URL is required'}), 400
+            
+        if not url.startswith(('http://', 'https://')):
+            return jsonify({'error': 'Invalid URL format. URL must start with http:// or https://'}), 400
+
+        try:
+            screenshot_bytes = await browser_service.get_screenshot(url)
+            screenshot = Image.open(io.BytesIO(screenshot_bytes))
+        except Exception as e:
+            app.logger.error(f"Screenshot error: {str(e)}")
+            return jsonify({'error': 'Failed to capture screenshot'}), 500
+
+        ai_question = """Analyze the image and respond exclusively with a JSON object containing the following keys:
+                'description': A brief description of the item in the image, or 'not found' if unavailable.
+                'price': The item's price in the image, or 'not found' if unavailable.
+
+                Do not include any additional text outside the JSON object."""
+
+        ollama_response = process_image(
+            image=screenshot,
+            prompt=ai_question,
+            stream=False
         )
         
-        # Clean up temporary file
-        os.unlink(temp_filename)
+        app.logger.debug(f"Ollama Response: {ollama_response['message']['content']}")
         
-        return response
-    except Exception as e:
-        # Clean up temporary file even if there's an error
-        if os.path.exists(temp_filename):
-            os.unlink(temp_filename)
-        return {"error": str(e)}
+        # Parse JSON from the content string
+        try:
+            content = json.loads(ollama_response["message"]["content"])
+            # Get values from parsed JSON
+            description = content.get('description', 'not found')
+            price_str = content.get('price', 'not found')
+            
+            # Convert price string to float if possible
+            try:
+                # Remove currency symbols and convert to float
+                price = float(''.join(c for c in price_str if c.isdigit() or c == '.'))
+            except (ValueError, AttributeError):
+                price = 0.0
 
-def main():
-    st.title("🦙 Llama 3.2 Vision with Ollama")
-    
-    # Main content area
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        st.header("Upload Image")
-        
-        # Drag and drop image upload
-        uploaded_file = st.file_uploader("Choose an image...", 
-            type=["jpg", "jpeg", "png", "bmp", "webp", "tiff"])
-        
-        if uploaded_file is not None:
-            # Display the uploaded image
-            image = Image.open(uploaded_file)
-            st.image(image, caption="Uploaded Image", use_container_width=True)
+            app.logger.debug(f"Description: {description}")
+            app.logger.debug(f"Price: {price}")
+
+            add_or_update_website(
+                url=url,
+                description=description if description != 'not found' else url,
+                price=price,
+                image=screenshot
+            )
             
-            # Get prompt from user
-            prompt = st.text_area("Enter your prompt:", 
-                                 value="What's in this image? Describe it in detail.")
+            return jsonify({'success': True, 'message': 'Item added successfully'})
             
-            # Process button
-            process_button = st.button("Process with Llama 3.2")
+        except json.JSONDecodeError as e:
+            app.logger.error(f"Failed to parse JSON response: {e}")
+            return jsonify({'error': 'Failed to parse AI response'}), 500
+
+    except Exception as e:
+        app.logger.error(f"Error adding item: {str(e)}")
+        return jsonify({'error': f'Error adding item: {str(e)}'}), 500
+
+@app.route('/delete-item', methods=['POST'])
+async def delete_item():
+    try:
+        data = await request.get_json()
+        if not data or 'url' not in data:
+            return jsonify({'error': 'URL is required'}), 400
             
-            if process_button:
-                with st.spinner("Processing image with Llama 3.2..."):
-                    # Process with Ollama
-                    with col2:
-                        st.header("Model Response")
-                        response = process_image(image, prompt)
-                        
-                        if isinstance(response, dict) and "error" in response:
-                            st.error(f"Error: {response['error']}")
-                        else:
-                            # Display the response message
-                            st.markdown(response['message']['content'])
-                            
-                            # Display additional info if available
-                            with st.expander("Response Details"):
-                                st.json({
-                                    "model": response.get("model", ""),
-                                    "created_at": response.get("created_at", ""),
-                                    "role": response['message'].get("role", ""),
-                                    "total_duration": response.get("total_duration", ""),
-                                    "eval_count": response.get("eval_count", ""),
-                                    "prompt_eval_count": response.get("prompt_eval_count", "")
-                                })
+        url = data['url']
+        if delete_website(url):
+            return jsonify({'success': True, 'message': 'Item deleted successfully'})
+        else:
+            return jsonify({'error': 'Item not found'}), 404
+            
+    except Exception as e:
+        app.logger.error(f"Error deleting item: {str(e)}")
+        return jsonify({'error': f'Error deleting item: {str(e)}'}), 500
+
+@app.before_serving
+async def startup():
+    await browser_service.init_browser()
+
+@app.after_serving
+async def shutdown():
+    await browser_service.cleanup()
 
 if __name__ == "__main__":
-    main()
+    app.run(debug=True, host='0.0.0.0', port=5000)
