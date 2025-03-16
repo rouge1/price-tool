@@ -7,7 +7,6 @@ from apps.browser_service import BrowserService
 import base64
 import io
 import logging
-import asyncio
 import json
 
 app = Quart(__name__)
@@ -68,33 +67,27 @@ async def add_item():
             stream=False
         )
         
-        app.logger.debug(f"Ollama Response: {ollama_response['message']['content']}")
+        app.logger.debug(f"Ollama Response: {ollama_response}")
         
         # Parse JSON from the content string
         try:
-            content = json.loads(ollama_response["message"]["content"])
-            # Get values from parsed JSON
-            description = content.get('description', 'not found')
-            price_str = content.get('price', 'not found')
+            content = ollama_response["message"]["content"]
+            app.logger.debug(f"\nContent: {content}")
             
-            # Convert price string to float if possible
-            try:
-                # Remove currency symbols and convert to float
-                price = float(''.join(c for c in price_str if c.isdigit() or c == '.'))
-            except (ValueError, AttributeError):
-                price = 0.0
-
+            description = content["message"]["content"]["description"]
+            price_str = content["message"]["content"]["price"]
+            
             app.logger.debug(f"Description: {description}")
-            app.logger.debug(f"Price: {price}")
-
-            add_or_update_website(
-                url=url,
-                description=description if description != 'not found' else url,
-                price=price,
-                image=screenshot
-            )
+            app.logger.debug(f"Price: {price_str}")
             
-            return jsonify({'success': True, 'message': 'Item added successfully'})
+            # add_or_update_website(
+            #     url=url,
+            #     description=description if description != 'not found' else url,
+            #     price=0.0,
+            #     image=screenshot
+            # )
+            
+            # return jsonify({'success': True, 'message': 'Item added successfully'})
             
         except json.JSONDecodeError as e:
             app.logger.error(f"Failed to parse JSON response: {e}")

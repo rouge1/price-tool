@@ -35,7 +35,8 @@ def process_image(image, prompt, stream=False):
                 'content': prompt,
                 'images': [temp_filename]
             }],
-            stream=stream
+            stream=stream,
+            options={'temperature': 0.3}    
         )
         
         # Clean up temporary file
