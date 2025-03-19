@@ -140,6 +140,34 @@ async def delete_item():
         app.logger.error(f"Error deleting item: {str(e)}")
         return jsonify({'error': f'Error deleting item: {str(e)}'}), 500
 
+@app.route('/update-description', methods=['POST'])
+async def update_description():
+    try:
+        data = await request.get_json()
+        if not data or 'url' not in data or 'description' not in data:
+            return jsonify({'error': 'URL and description are required'}), 400
+            
+        url = data['url']
+        description = data['description'].strip()
+        
+        if not description:
+            return jsonify({'error': 'Description cannot be empty'}), 400
+            
+        session = Session()
+        try:
+            website = session.query(Website).filter_by(url=url).first()
+            if website:
+                website.description = description
+                session.commit()
+                return jsonify({'success': True, 'message': 'Description updated successfully'})
+            return jsonify({'error': 'Item not found'}), 404
+        finally:
+            session.close()
+            
+    except Exception as e:
+        app.logger.error(f"Error updating description: {str(e)}")
+        return jsonify({'error': f'Error updating description: {str(e)}'}), 500
+
 @app.before_serving
 async def startup():
     await browser_service.init_browser()
