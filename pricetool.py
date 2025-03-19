@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 from quart import Quart, render_template, request, jsonify
 from PIL import Image
-from apps.database import init_db, add_or_update_website, get_all_websites, delete_website
+from apps.database import (
+    init_db, Website, PriceHistory, Session, 
+    record_price_update, extract_price_info
+)
 from apps.ollama import process_image
 from apps.browser_service import BrowserService
 import base64
 import io
 import logging
 import json
+from datetime import datetime, timezone
 
 app = Quart(__name__)
 init_db()
@@ -29,10 +33,15 @@ def b64encode_filter(data):
 
 @app.route('/')
 async def index():
-    websites = get_all_websites()
-    return await render_template('index.html', 
-                         title="Modern Price Tool",
-                         websites=websites)
+    session = Session()
+    try:
+        # For now, just get all websites since we haven't implemented user auth yet
+        websites = session.query(Website).all()
+        return await render_template('index.html', 
+                            title="Modern Price Tool",
+                            websites=websites)
+    finally:
+        session.close()
 
 @app.route('/add-item', methods=['POST'])
 async def add_item():
@@ -56,8 +65,8 @@ async def add_item():
             return jsonify({'error': 'Failed to capture screenshot'}), 500
 
         ai_question = """Analyze the image and respond exclusively with a JSON object containing the following keys:
-                'description': A brief description of the item in the image, or 'not found' if unavailable.
-                'price': The item's price in the image, or 'not found' if unavailable.
+                description: A brief description of the item in the image, or not found if unavailable.
+                price: The item's price in the image, or not found if unavailable.
 
                 Do not include any additional text outside the JSON object."""
 
@@ -68,27 +77,38 @@ async def add_item():
         )
         
         app.logger.debug(f"Ollama Response: {ollama_response}")
-        
+
         # Parse JSON from the content string
         try:
-            content = ollama_response["message"]["content"]
-            app.logger.debug(f"\nContent: {content}")
+            response = json.loads(ollama_response["message"]["content"])
+            description = response.get('description', 'not found')
+            price_str = response.get('price', 'not found')
             
-            description = content["message"]["content"]["description"]
-            price_str = content["message"]["content"]["price"]
+            app.logger.debug(f"\n\nDescription: {description}, Price: {price_str}\n")
             
-            app.logger.debug(f"Description: {description}")
-            app.logger.debug(f"Price: {price_str}")
+            # Extract initial price info
+            price_float, currency, raw_price = extract_price_info(price_str)
             
-            # add_or_update_website(
-            #     url=url,
-            #     description=description if description != 'not found' else url,
-            #     price=0.0,
-            #     image=screenshot
-            # )
-            
-            # return jsonify({'success': True, 'message': 'Item added successfully'})
-            
+            session = Session()
+            try:
+                website = Website(
+                    url=url,
+                    description=description if description != 'not found' else url,
+                    current_price=price_float,
+                    currency=currency,
+                    image_data=screenshot_bytes,
+                    last_updated=datetime.now(timezone.utc)
+                )
+                session.add(website)
+                session.commit()
+                
+                # Record initial price history
+                record_price_update(website.id, price_str, scraped_description=description)
+                
+                return jsonify({'success': True, 'message': 'Item added successfully'})
+            finally:
+                session.close()
+
         except json.JSONDecodeError as e:
             app.logger.error(f"Failed to parse JSON response: {e}")
             return jsonify({'error': 'Failed to parse AI response'}), 500
@@ -105,10 +125,16 @@ async def delete_item():
             return jsonify({'error': 'URL is required'}), 400
             
         url = data['url']
-        if delete_website(url):
-            return jsonify({'success': True, 'message': 'Item deleted successfully'})
-        else:
+        session = Session()
+        try:
+            website = session.query(Website).filter_by(url=url).first()
+            if website:
+                session.delete(website)
+                session.commit()
+                return jsonify({'success': True, 'message': 'Item deleted successfully'})
             return jsonify({'error': 'Item not found'}), 404
+        finally:
+            session.close()
             
     except Exception as e:
         app.logger.error(f"Error deleting item: {str(e)}")

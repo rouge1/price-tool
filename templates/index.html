@@ -57,7 +57,7 @@
                             <div class="col-md-4">
                                 <h5 class="card-title">{{ website.description or 'New Item' }}</h5>
                                 <div class="price-info">
-                                    <span class="current-price">${{ "%.2f"|format(website.current_price or 0) }}</span>
+                                    <span class="current-price">{{ website.currency }}{{ "%.2f"|format(website.current_price or 0) }}</span>
                                 </div>
                                 <div class="mt-2">
                                     <span class="badge bg-secondary me-2">New</span>
