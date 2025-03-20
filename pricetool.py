@@ -3,7 +3,8 @@ from quart import Quart, render_template, request, jsonify
 from PIL import Image
 from apps.database import (
     init_db, Website, PriceHistory, Session, 
-    record_price_update, extract_price_info, delete_website
+    record_price_update, extract_price_info, delete_website,
+    get_price_history  # Add this import
 )
 from apps.ollama import process_image
 from apps.browser_service import BrowserService
@@ -162,6 +163,20 @@ async def update_description():
     except Exception as e:
         app.logger.error(f"Error updating description: {str(e)}")
         return jsonify({'error': f'Error updating description: {str(e)}'}), 500
+
+@app.route('/price-history/<website_id>')
+async def price_history(website_id):
+    try:
+        history = get_price_history(int(website_id), days=30)
+        data = [{
+            'date': h.timestamp.isoformat(),
+            'price': h.price,
+            'currency': h.currency
+        } for h in history]
+        return jsonify(data)
+    except Exception as e:
+        app.logger.error(f"Error fetching price history: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.before_serving
 async def startup():
