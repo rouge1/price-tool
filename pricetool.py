@@ -3,7 +3,7 @@ from quart import Quart, render_template, request, jsonify
 from PIL import Image
 from apps.database import (
     init_db, Website, PriceHistory, Session, 
-    record_price_update, extract_price_info
+    record_price_update, extract_price_info, delete_website
 )
 from apps.ollama import process_image
 from apps.browser_service import BrowserService
@@ -125,16 +125,11 @@ async def delete_item():
             return jsonify({'error': 'URL is required'}), 400
             
         url = data['url']
-        session = Session()
-        try:
-            website = session.query(Website).filter_by(url=url).first()
-            if website:
-                session.delete(website)
-                session.commit()
-                return jsonify({'success': True, 'message': 'Item deleted successfully'})
-            return jsonify({'error': 'Item not found'}), 404
-        finally:
-            session.close()
+        success = delete_website(url)
+        
+        if success:
+            return jsonify({'success': True, 'message': 'Item deleted successfully'})
+        return jsonify({'error': 'Item not found'}), 404
             
     except Exception as e:
         app.logger.error(f"Error deleting item: {str(e)}")

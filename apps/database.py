@@ -53,10 +53,10 @@ class Website(Base):
     image_hash = Column(String)  # Store image hash for comparison
     last_updated = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
-    # Relationships
+    # Update relationships with cascade delete
+    price_history = relationship("PriceHistory", back_populates="website", cascade="all, delete-orphan")
+    alerts = relationship("Alert", back_populates="website", cascade="all, delete-orphan")
     users = relationship("User", secondary=user_website, back_populates="websites")
-    price_history = relationship("PriceHistory", back_populates="website")
-    alerts = relationship("Alert", back_populates="website")
 
 class PriceHistory(Base):
     __tablename__ = 'price_history'
@@ -260,5 +260,21 @@ def get_user_websites(user_id):
         if user:
             return user.websites
         return []
+    finally:
+        session.close()
+
+def delete_website(url):
+    """Delete a website and all its related data"""
+    session = Session()
+    try:
+        website = session.query(Website).filter_by(url=url).first()
+        if website:
+            session.delete(website)
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        session.rollback()
+        raise e
     finally:
         session.close()
