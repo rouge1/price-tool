@@ -15,6 +15,12 @@
         .hover-zoom:hover {
             transform: scale(1.05);
         }
+        body {
+            background-image: url("{{ url_for('static', filename='price_background.jpg') }}");
+            background-size: auto; /* Change to 'auto' to allow tiling */
+            background-repeat: repeat; /* Change to 'repeat' to enable tiling */
+            background-attachment: fixed;
+        }
     </style>
 </head>
 <body class="bg-light">
@@ -44,16 +50,15 @@
             {% for website in websites %}
             <div class="col-12 mb-4">
                 <div class="card shadow-sm hover-card">
-                    <div class="card-body position-relative"> <!-- Add position-relative here -->
-                        <!-- Delete button -->
+                    <div class="card-body position-relative">
                         <button class="btn btn-link text-danger delete-btn position-absolute top-0 end-0 mt-2 me-2"
                                 onclick="confirmDelete('{{ website.url }}')">
                             <i class="fas fa-trash"></i>
                         </button>
                         
-                        <div class="row">
-                            <!-- Thumbnail Column - decreased to col-md-3 -->
-                            <div class="col-md-3">
+                        <div class="row g-3 align-items-center">
+                            <!-- Thumbnail Column -->
+                            <div class="col-md-2">
                                 <div class="item-thumbnail">
                                     <a href="{{ website.url }}" target="_blank" rel="noopener noreferrer">
                                         {% if website.image_data %}
@@ -70,31 +75,35 @@
                                     </a>
                                 </div>
                             </div>
-                            <!-- Content Column - increased to col-md-3 -->
+                            <!-- Info Column -->
                             <div class="col-md-3">
-                                <div class="d-flex align-items-start">
-                                    <h5 class="card-title mb-0 me-2">{{ website.description or 'New Item' }}</h5>
-                                    <button class="btn btn-link btn-sm p-0 mt-1 edit-description" 
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#editDescriptionModal"
-                                            data-url="{{ website.url }}"
-                                            data-description="{{ website.description }}">
-                                        <i class="fas fa-pencil text-muted"></i>
-                                    </button>
-                                </div>
-                                <div class="price-info">
-                                    <span class="current-price">
-                                        {% if website.current_price %}
-                                            {% set price = website.current_price %}
-                                            {{ website.currency }}{{ '{:,.2f}'.format(price).rstrip('0').rstrip('.') if price < 100 else '{:,.0f}'.format(price) }}
-                                        {% else %}
-                                            {{ website.currency }}0
-                                        {% endif %}
-                                    </span>
+                                <div class="d-flex flex-column h-100 justify-content-between">
+                                    <div>
+                                        <div class="d-flex align-items-start gap-2">
+                                            <h5 class="card-title mb-2">{{ website.description or 'New Item' }}</h5>
+                                            <button class="btn btn-link btn-sm p-0 edit-description" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#editDescriptionModal"
+                                                    data-url="{{ website.url }}"
+                                                    data-description="{{ website.description }}">
+                                                <i class="fas fa-pencil text-muted"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="price-info mb-0">
+                                        <span class="current-price">
+                                            {% if website.current_price %}
+                                                {% set price = website.current_price %}
+                                                {{ website.currency }}{{ '{:,.2f}'.format(price).rstrip('0').rstrip('.') if price < 100 else '{:,.0f}'.format(price) }}
+                                            {% else %}
+                                                {{ website.currency }}0
+                                            {% endif %}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                            <!-- Graph Column remains col-md-6 -->
-                            <div class="col-md-6">
+                            <!-- Graph Column -->
+                            <div class="col-md-7">
                                 <div class="price-graph">
                                     <canvas id="priceChart{{ website.id }}"></canvas>
                                 </div>
@@ -222,6 +231,9 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
+                            legend: {
+                                display: false  // Add this line to hide the legend
+                            },
                             title: {
                                 display: true,
                                 text: '30-Day Price History'
