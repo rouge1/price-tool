@@ -20,6 +20,20 @@
             background-size: auto; /* Change to 'auto' to allow tiling */
             background-repeat: repeat; /* Change to 'repeat' to enable tiling */
             background-attachment: fixed;
+            
+            /* Add a semi-transparent black overlay */
+            position: relative;
+        }
+
+        body::before {
+            content: "";
+            position: fixed; /* Use fixed instead of absolute */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.3); /* Adjust the alpha value (0.0 to 1.0) for dimness */
+            z-index: -1; /* Place the overlay behind the content */
         }
     </style>
 </head>

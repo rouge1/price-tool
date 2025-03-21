@@ -91,7 +91,7 @@
 .add-item-card {
     border: 2px dashed #dee2e6 !important;
     background: transparent;
-    min-height: 100px;
+    min-height: 50px;
     cursor: pointer;
     transition: all 0.2s ease-in-out;
 }
