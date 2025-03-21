@@ -83,7 +83,14 @@
                                     </button>
                                 </div>
                                 <div class="price-info">
-                                    <span class="current-price">{{ website.currency }}{{ "%.2f"|format(website.current_price or 0) }}</span>
+                                    <span class="current-price">
+                                        {% if website.current_price %}
+                                            {% set price = website.current_price %}
+                                            {{ website.currency }}{{ '{:,.2f}'.format(price).rstrip('0').rstrip('.') if price < 100 else '{:,.0f}'.format(price) }}
+                                        {% else %}
+                                            {{ website.currency }}0
+                                        {% endif %}
+                                    </span>
                                 </div>
                             </div>
                             <!-- Graph Column remains col-md-6 -->
@@ -221,14 +228,23 @@
                             },
                             tooltip: {
                                 callbacks: {
-                                    label: (context) => `${currency}${context.parsed.y.toFixed(2)}`
+                                    label: (context) => {
+                                        const value = context.parsed.y;
+                                        return `${currency}${value >= 100 ? 
+                                            value.toLocaleString('en-US', {maximumFractionDigits: 0}) : 
+                                            value.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                                    }
                                 }
                             }
                         },
                         scales: {
                             y: {
                                 ticks: {
-                                    callback: (value) => `${currency}${value}`
+                                    callback: (value) => {
+                                        return `${currency}${value >= 100 ? 
+                                            value.toLocaleString('en-US', {maximumFractionDigits: 0}) : 
+                                            value.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                                    }
                                 }
                             }
                         }

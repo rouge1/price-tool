@@ -98,7 +98,7 @@ def extract_price_info(price_str):
     Extract both the numeric price value and the currency symbol from a price string.
     
     Args:
-        price_str (str): The price string (e.g., '$29.99' or '29,99 €')
+        price_str (str): The price string (e.g., '$29.99' or '29,99 €' or '$28,000')
         
     Returns:
         tuple: (price_float, currency_symbol, raw_price_string)
@@ -107,41 +107,35 @@ def extract_price_info(price_str):
         return None, '$', None
         
     if not isinstance(price_str, str):
-        # If already a number, return it with default currency
         try:
             return float(price_str), '$', str(price_str)
         except (ValueError, TypeError):
             return None, '$', None
     
-    # Save the original string
     raw_price = price_str.strip()
     
-    # Extract currency symbol
     currency_symbols = {
         '$': 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY', '₩': 'KRW',
         'руб': 'RUB', '₹': 'INR', 'R$': 'BRL', 'CHF': 'CHF', 'A$': 'AUD',
         'C$': 'CAD', 'HK$': 'HKD', '₴': 'UAH', '₽': 'RUB'
     }
     
-    # Check for currency symbols at start or end
-    currency = '$'  # Default
-    
-    # Try to extract currency symbol
+    currency = '$'
     for symbol in sorted(currency_symbols.keys(), key=len, reverse=True):
         if symbol in price_str:
             currency = symbol
             break
-            
-    # Remove currency symbols and other non-numeric characters
-    # Keep only digits, dots, and commas
+    
+    # Remove currency symbols and whitespace
     cleaned = ''.join(c for c in price_str if c.isdigit() or c in '.,')
     
-    # Handle European number format (comma as decimal separator)
-    if ',' in cleaned and '.' not in cleaned:
-        cleaned = cleaned.replace(',', '.')
-    elif ',' in cleaned and '.' in cleaned:
-        # If both are present, assume comma is thousand separator
-        cleaned = cleaned.replace(',', '')
+    # Handle different number formats
+    if ',' in cleaned:
+        # Check position of comma relative to the end
+        if len(cleaned.split(',')[-1]) == 2:  # Comma is decimal separator (e.g., 29,99)
+            cleaned = cleaned.replace(',', '.')
+        else:  # Comma is thousands separator (e.g., 28,000)
+            cleaned = cleaned.replace(',', '')
     
     try:
         price_float = float(cleaned)
