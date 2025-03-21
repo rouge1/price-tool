@@ -78,7 +78,7 @@ async def add_item():
         )
         
         app.logger.debug(f"Ollama Response: {ollama_response}")
-
+        
         # Parse JSON from the content string
         try:
             response = json.loads(ollama_response["message"]["content"])
@@ -86,7 +86,10 @@ async def add_item():
             price_str = response.get('price', 'not found')
             
             app.logger.debug(f"\n\nDescription: {description}, Price: {price_str}\n")
-            
+
+            if response.get('description') == 'This site cannot be reached' or response.get('price') == 'not found':
+                return jsonify({'error': 'Unable to access the website. Please check if the URL is valid and the site is accessible.'}), 400
+    
             # Extract initial price info
             price_float, currency, raw_price = extract_price_info(price_str)
             
