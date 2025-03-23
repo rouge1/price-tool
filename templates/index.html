@@ -24,7 +24,7 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background-color: rgba(0, 0, 0, 0.3);
+        background-color: rgba(0, 0, 0, 0.5);
         z-index: -1;
     }
 
@@ -49,11 +49,11 @@
 
     .add-item-card:hover {
         /* Make sure to use the same background-size value here */
-        background: linear-gradient(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.9)), 
+        background: linear-gradient(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.7)), 
                     url("{{ url_for('static', filename='new_item3.png') }}") !important;
         background-position: center center !important;
         background-repeat: repeat !important;
-        background-size: 50px auto !important;  /* Use same size as above */
+        background-size: 150px auto !important;  /* Use same size as above */
         transition: all 0.3s ease;
     }
 
