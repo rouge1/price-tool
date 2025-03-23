@@ -34,12 +34,33 @@
     }
 
     .add-item-card {
-        background-color: rgba(255, 255, 255, 0.5) !important;
-        transition: background-color 0.3s ease;
+        height: 60px;
+        background: linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)), 
+                    url("{{ url_for('static', filename='new_item3.png') }}") !important;
+        background-position: center center !important;
+        background-repeat: repeat !important;
+        background-size: 300px auto !important;  /* Smaller tiles */
+        /* or */
+        /* background-size: 100px auto !important; */  /* Medium tiles */
+        /* or */
+        /* background-size: 150px auto !important; */  /* Larger tiles */
+        transition: all 0.3s ease;
     }
 
     .add-item-card:hover {
-        background-color: rgba(255, 255, 255, 0.9) !important;
+        /* Make sure to use the same background-size value here */
+        background: linear-gradient(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.9)), 
+                    url("{{ url_for('static', filename='new_item3.png') }}") !important;
+        background-position: center center !important;
+        background-repeat: repeat !important;
+        background-size: 50px auto !important;  /* Use same size as above */
+        transition: all 0.3s ease;
+    }
+
+    /* Optional: Make the plus icon more visible */
+    .add-item-card .fa-plus {
+        color: #000 !important;
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
     }
 </style>
 {% endblock %}
