@@ -43,12 +43,9 @@
                         </div>
                         <div class="price-info mb-0">
                             <span class="current-price">
-                                {% if website.current_price %}
-                                    {% set price = website.current_price %}
-                                    {{ website.currency }}{{ '{:,.2f}'.format(price).rstrip('0').rstrip('.') if price < 100 else '{:,.0f}'.format(price) }}
-                                {% else %}
-                                    {{ website.currency }}0
-                                {% endif %}
+                                {% set price = website.current_price or 0 %}
+                                {{ website.currency }}
+                                {{ '{:,.2f}'.format(price) if price < 10000 else '{:,.0f}'.format(price) }}
                             </span>
                         </div>
                     </div>
